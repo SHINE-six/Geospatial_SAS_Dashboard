@@ -32,11 +32,16 @@ def hexagon_layer(gdf_hexagons):
     hex_data['coordinates'] = hex_data['hex_geometry'].apply(lambda x: x.exterior.coords[:-1])
     hex_data = hex_data.dropna(subset=['coordinates'])
     
+    # Calculate the color gradient based on 'API' values
+    min_api = hex_data['API'].min()
+    max_api = hex_data['API'].max()
+    hex_data['color'] = hex_data['API'].apply(lambda x: [int(255 * (x - min_api) / (max_api - min_api)), 100, 200, 100] if not np.isnan(x) else [0, 0, 0, 0])
+    
     layer = pdk.Layer(
         'PolygonLayer',
         hex_data,
         get_polygon='coordinates',
-        get_fill_color=[180, 100, 200, 30],
+        get_fill_color='color',
         pickable=True,
         auto_highlight=True,
     )
