@@ -27,7 +27,7 @@ def load_data(year):
 
 # Convert GeoDataFrame to Pydeck layer
 def hexagon_layer(gdf_hexagons):
-    hex_data = gdf_hexagons[['hex_geometry', 'API', 'Temp', 'Humidity', 'Precip', 'Wind']]
+    hex_data = gdf_hexagons[['hex_geometry', 'API', 'Temp', 'Humidity', 'Precip', 'Wind', 'Vegetation', 'Traffic', 'Building', 'Altitude', 'Population']]
     hex_data = hex_data.explode('hex_geometry')
     hex_data['coordinates'] = hex_data['hex_geometry'].apply(lambda x: x.exterior.coords[:-1])
     hex_data = hex_data.dropna(subset=['coordinates'])
@@ -35,7 +35,7 @@ def hexagon_layer(gdf_hexagons):
     # Calculate the color gradient based on 'API' values
     min_api = hex_data['API'].min()
     max_api = hex_data['API'].max()
-    hex_data['color'] = hex_data['API'].apply(lambda x: [int(255 * (x - min_api) / (max_api - min_api)), 100, 170, 100] if not np.isnan(x) else [0, 0, 0, 0])
+    hex_data['color'] = hex_data['API'].apply(lambda x: [int(255 * (x - min_api) / (max_api - min_api)), 100, 170, 90] if not np.isnan(x) else [0, 0, 0, 0])
     
     layer = pdk.Layer(
         'PolygonLayer',
@@ -63,7 +63,7 @@ def main():
     view_state = pdk.ViewState(
         latitude=gdf_hexagons['center_lat'].mean(),
         longitude=gdf_hexagons['center_lon'].mean(),
-        zoom=10,
+        zoom=5,
         pitch=0,
     )
 
