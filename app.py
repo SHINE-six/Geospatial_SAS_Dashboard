@@ -12,7 +12,7 @@ def hexagon(center_point, size):
     return Polygon(hex_coords)
 
 # Load the dataset and filter by year
-@st.cache_data
+@st.cache_resource
 def load_data(year):
     data = pd.read_csv('FinalSuperset_joined_Nminmax.csv')
     data = data[data['Year'] == year]
@@ -21,21 +21,47 @@ def load_data(year):
     data['geometry'] = [Point(xy) for xy in zip(data['center_lon'], data['center_lat'])]
     gdf_centers = gpd.GeoDataFrame(data, geometry='geometry')
     hex_size = 0.06  # Adjust based on your data
-    gdf_centers['hex_geometry'] = gdf_centers['geometry'].apply(lambda x: hexagon(x, hex_size))
+    # Convert to numpy array first if necessary
+    geometries = np.asarray(gdf_centers['geometry'])
+
+    # Apply hexagon function and handle conversion
+    hex_geometries = [hexagon(geom, hex_size) for geom in geometries]
+    
+    gdf_centers['hex_geometry'] = hex_geometries
     gdf_hexagons = gpd.GeoDataFrame(gdf_centers, geometry='hex_geometry')
+    
     return gdf_hexagons
 
 # Convert GeoDataFrame to Pydeck layer
 def hexagon_layer(gdf_hexagons):
     hex_data = gdf_hexagons[['hex_geometry', 'API', 'Temp', 'Humidity', 'Precip', 'Wind', 'Vegetation', 'Traffic', 'Building', 'Altitude', 'Population']]
     hex_data = hex_data.explode('hex_geometry')
-    hex_data['coordinates'] = hex_data['hex_geometry'].apply(lambda x: x.exterior.coords[:-1])
-    hex_data = hex_data.dropna(subset=['coordinates'])
-    
+    coordinates_list = []
+    colors_list = []
+
     # Calculate the color gradient based on 'API' values
     min_api = hex_data['API'].min()
     max_api = hex_data['API'].max()
-    hex_data['color'] = hex_data['API'].apply(lambda x: [int(255 * (x - min_api) / (max_api - min_api)), 100, 170, 90] if not np.isnan(x) else [0, 0, 0, 0])
+    
+    # Iterate over the rows to process each geometry
+    for _, row in hex_data.iterrows():
+        hex_geometry = row['hex_geometry']
+        if hex_geometry and hasattr(hex_geometry, 'exterior'):
+            coords = hex_geometry.exterior.coords[:-1]
+            coordinates_list.append(coords)
+        else:
+            coordinates_list.append(None)
+        
+        api_value = row['API']
+        if not np.isnan(api_value):
+            color = [int(255 * (api_value - min_api) / (max_api - min_api)), 100, 170, 90]
+        else:
+            color = [0, 0, 0, 0]
+        colors_list.append(color)
+
+    hex_data['coordinates'] = coordinates_list
+    hex_data['color'] = colors_list
+    hex_data = hex_data.dropna(subset=['coordinates'])
     
     layer = pdk.Layer(
         'PolygonLayer',
